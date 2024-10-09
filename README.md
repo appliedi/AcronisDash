@@ -49,6 +49,26 @@ To run this application using Docker:
 
 3. Access the dashboard at `http://localhost:5000`
 
+## Docker Compose Deployment
+
+To run this application using Docker Compose:
+
+1. Make sure you have Docker Compose installed on your system.
+
+2. From the project root directory, run:
+   ```
+   docker-compose up --build
+   ```
+
+3. Access the dashboard at `http://localhost:5000`
+
+4. To stop the application, use:
+   ```
+   docker-compose down
+   ```
+
+Using Docker Compose simplifies the process of running the application and makes it easier to add additional services in the future if needed.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
