@@ -79,6 +79,27 @@ To run this application using Docker Compose:
 
 Using Docker Compose simplifies the process of running the application and makes it easier to add additional services in the future if needed.
 
+## Updating Dependencies
+
+If you make changes to the `requirements.txt` file or need to update dependencies:
+
+1. If you're using Docker Compose:
+   ```
+   docker-compose down
+   docker-compose build --no-cache
+   docker-compose up
+   ```
+
+2. If you're using Docker without Compose:
+   ```
+   docker stop <container_name>
+   docker rm <container_name>
+   docker build -t acronis-backup-dashboard .
+   docker run --env-file .env -p 5000:5000 acronis-backup-dashboard
+   ```
+
+These commands will ensure that your Docker image is rebuilt with the latest dependencies.
+
 ## Environment Variables
 
 This project uses environment variables to manage sensitive information and configuration. The following variables are required:
