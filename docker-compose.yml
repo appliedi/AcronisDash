@@ -16,7 +16,7 @@ services:
     command: >
       sh -c "
         mkdir -p /app/data &&
-        touch /app/data/device_notes.json /app/data/device_status.json /app/data/status_changes.log &&
+        touch /app/data/device_notes.json /app/data/device_status.json /app/data/status_changes.log /app/data/app.log &&
         chown -R nobody:nogroup /app/data &&
         flask run --host=0.0.0.0
       "

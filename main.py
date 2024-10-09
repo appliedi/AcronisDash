@@ -6,6 +6,8 @@ from flask import Flask, jsonify, request, send_from_directory, g
 import pytz
 from dotenv import load_dotenv
 import re
+import logging
+from logging.handlers import RotatingFileHandler
 
 # Load environment variables
 load_dotenv()
@@ -22,6 +24,16 @@ DATA_DIR = 'data'
 JSON_FILE = os.path.join(DATA_DIR, 'device_notes.json')
 DEVICE_STATUS_FILE = os.path.join(DATA_DIR, 'device_status.json')
 STATUS_CHANGES_LOG = os.path.join(DATA_DIR, 'status_changes.log')
+APP_LOG_FILE = os.path.join(DATA_DIR, 'app.log')
+
+# Set up logging
+if not os.path.exists(DATA_DIR):
+    os.makedirs(DATA_DIR)
+
+handler = RotatingFileHandler(APP_LOG_FILE, maxBytes=10000, backupCount=1)
+handler.setLevel(logging.INFO)
+app.logger.addHandler(handler)
+app.logger.setLevel(logging.INFO)
 
 def init_db():
     os.makedirs(DATA_DIR, exist_ok=True)
