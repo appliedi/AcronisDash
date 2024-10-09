@@ -7,9 +7,16 @@ services:
       - "5000:5000"
     volumes:
       - .:/app
+      - ./data:/app/data
     environment:
       - FLASK_ENV=development
       - FLASK_APP=main.py
     env_file:
       - .env
-    command: flask run --host=0.0.0.0
+    command: >
+      sh -c "
+        mkdir -p /app/data &&
+        touch /app/data/device_notes.json /app/data/device_status.json /app/data/status_changes.log &&
+        chown -R nobody:nogroup /app/data &&
+        flask run --host=0.0.0.0
+      "

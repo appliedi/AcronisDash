@@ -18,10 +18,13 @@ datacenter_url = os.getenv('DATACENTER_URL')
 app = Flask(__name__)
 
 # JSON file setup
-JSON_FILE = 'device_notes.json'
-DEVICE_STATUS_FILE = 'device_status.json'
+DATA_DIR = 'data'
+JSON_FILE = os.path.join(DATA_DIR, 'device_notes.json')
+DEVICE_STATUS_FILE = os.path.join(DATA_DIR, 'device_status.json')
+STATUS_CHANGES_LOG = os.path.join(DATA_DIR, 'status_changes.log')
 
 def init_db():
+    os.makedirs(DATA_DIR, exist_ok=True)
     if not os.path.exists(JSON_FILE):
         with open(JSON_FILE, 'w') as f:
             json.dump({}, f)
@@ -57,9 +60,23 @@ def get_access_token():
         'client_secret': client_secret,
         'grant_type': 'client_credentials'
     }
-    response = requests.post(auth_url, data=auth_payload)
-    token_data = response.json()
-    return token_data['access_token']
+    try:
+        response = requests.post(auth_url, data=auth_payload)
+        response.raise_for_status()  # Raise an exception for bad status codes
+        token_data = response.json()
+        if 'access_token' not in token_data:
+            app.logger.error(f"Access token not found in response. Response: {token_data}")
+            raise ValueError("Access token not found in response")
+        return token_data['access_token']
+    except requests.RequestException as e:
+        app.logger.error(f"Error getting access token: {str(e)}")
+        raise
+    except ValueError as e:
+        app.logger.error(str(e))
+        raise
+    except Exception as e:
+        app.logger.error(f"Unexpected error getting access token: {str(e)}")
+        raise
 
 def fetch_resources(access_token):
     headers = {
@@ -169,17 +186,25 @@ def serve_dashboard():
 def get_devices():
     filter_date = request.args.get('date', datetime.now(pytz.UTC).strftime('%Y-%m-%d'))
     filter_tenant = request.args.get('tenant', '')
-    access_token = get_access_token()
-    resources = fetch_resources(access_token)
-    processed_resources = process_resources(resources, filter_date, filter_tenant)
-    return jsonify(processed_resources)
+    try:
+        access_token = get_access_token()
+        resources = fetch_resources(access_token)
+        processed_resources = process_resources(resources, filter_date, filter_tenant)
+        return jsonify(processed_resources)
+    except Exception as e:
+        app.logger.error(f"Error in get_devices: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/tenants')
 def get_tenants():
-    access_token = get_access_token()
-    resources = fetch_resources(access_token)
-    tenants = set(resource.get('context', {}).get('tenant_name', 'N/A') for resource in resources)
-    return jsonify(list(tenants))
+    try:
+        access_token = get_access_token()
+        resources = fetch_resources(access_token)
+        tenants = set(resource.get('context', {}).get('tenant_name', 'N/A') for resource in resources)
+        return jsonify(list(tenants))
+    except Exception as e:
+        app.logger.error(f"Error in get_tenants: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/device_note', methods=['POST'])
 def add_device_note():
@@ -211,7 +236,7 @@ def toggle_device_status():
 
     # Log the status change
     log_entry = f"{timestamp} - Device: {device_name}, New Status: {'Active' if new_status else 'Inactive'}, IP: {ip_address}"
-    with open('status_changes.log', 'a') as log_file:
+    with open(STATUS_CHANGES_LOG, 'a') as log_file:
         log_file.write(log_entry + '\n')
 
     # Update the device status
