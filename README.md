@@ -110,6 +110,36 @@ This project uses environment variables to manage sensitive information and conf
 
 These variables should be set in a `.env` file in the root directory of the project. This file is not committed to version control for security reasons.
 
+## Troubleshooting
+
+If you encounter a 404 Not Found error when trying to access the dashboard, try the following steps:
+
+1. Verify that the application is running:
+   - If running locally, check the console output for any error messages.
+   - If using Docker, use `docker ps` to check if the container is running.
+
+2. Confirm the correct URL:
+   - The application should be accessible at `http://localhost:5000` by default.
+   - If you've modified the port or are accessing it from a different machine, adjust the URL accordingly.
+
+3. Check firewall settings:
+   - Ensure that your firewall is not blocking incoming connections on port 5000.
+
+4. Verify Docker port mapping:
+   - If using Docker, check that the port mapping is correct in your `docker run` command or `docker-compose.yml` file.
+
+5. Check the logs:
+   - For Docker: `docker logs <container_name>`
+   - For Docker Compose: `docker-compose logs`
+
+6. Ensure all files are in the correct location:
+   - The `dashboard.html` file should be in the same directory as `main.py`.
+
+7. Verify the Flask route:
+   - Check that the route for the root URL ('/') is correctly defined in `main.py`.
+
+If you're still encountering issues, please open an issue on the GitHub repository with details about your setup and the exact error message you're seeing.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
