@@ -1,6 +1,7 @@
 import os
 import requests
 import json
+import sqlite3
 from datetime import datetime, timedelta
 from flask import Flask, jsonify, request, send_from_directory
 import pytz
@@ -16,6 +17,26 @@ client_secret = os.getenv('CLIENT_SECRET')
 datacenter_url = os.getenv('DATACENTER_URL')
 
 app = Flask(__name__)
+
+# SQLite database setup
+DATABASE = 'device_notes.db'
+
+def init_db():
+    with sqlite3.connect(DATABASE) as conn:
+        conn.execute('''CREATE TABLE IF NOT EXISTS device_notes
+                        (device_name TEXT PRIMARY KEY, note TEXT)''')
+
+def get_db():
+    db = getattr(g, '_database', None)
+    if db is None:
+        db = g._database = sqlite3.connect(DATABASE)
+    return db
+
+@app.teardown_appcontext
+def close_connection(exception):
+    db = getattr(g, '_database', None)
+    if db is not None:
+        db.close()
 
 def get_access_token():
     auth_url = f'{datacenter_url}/api/2/idp/token'
@@ -61,6 +82,13 @@ def parse_date(date_string):
         return datetime.fromisoformat(parsed_string)
     raise ValueError(f"Invalid date format: {date_string}")
 
+def get_device_note(device_name):
+    with sqlite3.connect(DATABASE) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT note FROM device_notes WHERE device_name = ?", (device_name,))
+        result = cursor.fetchone()
+        return result[0] if result else None
+
 def process_resources(resources, filter_date, filter_tenant):
     processed_resources = []
     filter_date = datetime.fromisoformat(filter_date).replace(tzinfo=pytz.UTC)
@@ -69,6 +97,7 @@ def process_resources(resources, filter_date, filter_tenant):
         context = resource.get('context', {})
         resource_type = context.get('type')
         tenant_name = context.get('tenant_name', 'N/A')
+        device_name = context.get('name', 'N/A')
         
         if resource_type not in ['resource.virtual_machine.vmwesx', 'resource.virtual_machine.mshyperv', 'resource.machine']:
             continue
@@ -84,7 +113,11 @@ def process_resources(resources, filter_date, filter_tenant):
                 last_success_run = policy.get('last_success_run', '')
                 break
 
-        if last_success_run:
+        note = get_device_note(device_name)
+        if note:
+            status = 'Not Backed Up'
+            status_message = note
+        elif last_success_run:
             try:
                 last_backup = parse_date(last_success_run)
                 if last_backup > filter_date:
@@ -102,7 +135,7 @@ def process_resources(resources, filter_date, filter_tenant):
             status_message = "This device has never been backed up. Immediate action required."
 
         processed_resources.append({
-            'name': context.get('name', 'N/A'),
+            'name': device_name,
             'type': resource_type,
             'tenant_name': tenant_name,
             'lastBackup': last_success_run if last_success_run else 'Never',
@@ -132,5 +165,23 @@ def get_tenants():
     tenants = set(resource.get('context', {}).get('tenant_name', 'N/A') for resource in resources)
     return jsonify(list(tenants))
 
+@app.route('/api/device_note', methods=['POST'])
+def add_device_note():
+    data = request.json
+    device_name = data.get('device_name')
+    note = data.get('note')
+    if device_name and note:
+        with sqlite3.connect(DATABASE) as conn:
+            conn.execute("INSERT OR REPLACE INTO device_notes (device_name, note) VALUES (?, ?)",
+                         (device_name, note))
+        return jsonify({"message": "Note added successfully"}), 200
+    return jsonify({"error": "Invalid data"}), 400
+
+@app.route('/api/device_note/<device_name>', methods=['GET'])
+def get_device_note_api(device_name):
+    note = get_device_note(device_name)
+    return jsonify({"note": note if note else ''})
+
 if __name__ == '__main__':
+    init_db()
     app.run(debug=True, host='0.0.0.0')
