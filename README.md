@@ -2,7 +2,7 @@
 
 This project is a web-based dashboard for monitoring Acronis backup statuses across multiple devices and tenants.
 
-## Features
+## Features 
 
 - Display backup status for multiple devices
 - Filter devices by status (OK, Warning, Error)
