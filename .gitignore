@@ -21,6 +21,7 @@ Thumbs.db
 # Application specific
 *.log
 *.sqlite
+*.json
 
 # Credentials (for security, never commit these)
 *.pem

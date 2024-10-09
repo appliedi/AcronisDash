@@ -1,9 +1,8 @@
 import os
 import requests
 import json
-import sqlite3
 from datetime import datetime, timedelta
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, g
 import pytz
 from dotenv import load_dotenv
 import re
@@ -18,25 +17,38 @@ datacenter_url = os.getenv('DATACENTER_URL')
 
 app = Flask(__name__)
 
-# SQLite database setup
-DATABASE = 'device_notes.db'
+# JSON file setup
+JSON_FILE = 'device_notes.json'
+DEVICE_STATUS_FILE = 'device_status.json'
 
 def init_db():
-    with sqlite3.connect(DATABASE) as conn:
-        conn.execute('''CREATE TABLE IF NOT EXISTS device_notes
-                        (device_name TEXT PRIMARY KEY, note TEXT)''')
+    if not os.path.exists(JSON_FILE):
+        with open(JSON_FILE, 'w') as f:
+            json.dump({}, f)
+    if not os.path.exists(DEVICE_STATUS_FILE):
+        with open(DEVICE_STATUS_FILE, 'w') as f:
+            json.dump({}, f)
 
 def get_db():
-    db = getattr(g, '_database', None)
-    if db is None:
-        db = g._database = sqlite3.connect(DATABASE)
-    return db
+    if 'db' not in g:
+        with open(JSON_FILE, 'r') as f:
+            g.db = json.load(f)
+    return g.db
+
+def get_device_status():
+    if 'device_status' not in g:
+        with open(DEVICE_STATUS_FILE, 'r') as f:
+            g.device_status = json.load(f)
+    return g.device_status
 
 @app.teardown_appcontext
-def close_connection(exception):
-    db = getattr(g, '_database', None)
-    if db is not None:
-        db.close()
+def close_db(error):
+    if hasattr(g, 'db'):
+        with open(JSON_FILE, 'w') as f:
+            json.dump(g.db, f)
+    if hasattr(g, 'device_status'):
+        with open(DEVICE_STATUS_FILE, 'w') as f:
+            json.dump(g.device_status, f)
 
 def get_access_token():
     auth_url = f'{datacenter_url}/api/2/idp/token'
@@ -83,15 +95,13 @@ def parse_date(date_string):
     raise ValueError(f"Invalid date format: {date_string}")
 
 def get_device_note(device_name):
-    with sqlite3.connect(DATABASE) as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT note FROM device_notes WHERE device_name = ?", (device_name,))
-        result = cursor.fetchone()
-        return result[0] if result else None
+    db = get_db()
+    return db.get(device_name)
 
 def process_resources(resources, filter_date, filter_tenant):
     processed_resources = []
     filter_date = datetime.fromisoformat(filter_date).replace(tzinfo=pytz.UTC)
+    device_status = get_device_status()
     
     for resource in resources:
         context = resource.get('context', {})
@@ -113,8 +123,13 @@ def process_resources(resources, filter_date, filter_tenant):
                 last_success_run = policy.get('last_success_run', '')
                 break
 
+        is_active = device_status.get(device_name, True)
         note = get_device_note(device_name)
-        if note:
+
+        if not is_active:
+            status = 'Not Backed Up'
+            status_message = "Device is inactive"
+        elif note:
             status = 'Not Backed Up'
             status_message = note
         elif last_success_run:
@@ -140,7 +155,8 @@ def process_resources(resources, filter_date, filter_tenant):
             'tenant_name': tenant_name,
             'lastBackup': last_success_run if last_success_run else 'Never',
             'status': status,
-            'status_message': status_message
+            'status_message': status_message,
+            'isActive': is_active
         })
 
     return processed_resources
@@ -171,9 +187,9 @@ def add_device_note():
     device_name = data.get('device_name')
     note = data.get('note')
     if device_name and note:
-        with sqlite3.connect(DATABASE) as conn:
-            conn.execute("INSERT OR REPLACE INTO device_notes (device_name, note) VALUES (?, ?)",
-                         (device_name, note))
+        db = get_db()
+        db[device_name] = note
+        close_db(None)
         return jsonify({"message": "Note added successfully"}), 200
     return jsonify({"error": "Invalid data"}), 400
 
@@ -182,6 +198,30 @@ def get_device_note_api(device_name):
     note = get_device_note(device_name)
     return jsonify({"note": note if note else ''})
 
+@app.route('/api/toggle_device_status', methods=['POST'])
+def toggle_device_status():
+    data = request.json
+    device_name = data.get('device_name')
+    new_status = data.get('new_status')
+    timestamp = data.get('timestamp')
+    ip_address = data.get('ip_address')
+
+    if device_name is None or new_status is None:
+        return jsonify({"error": "Invalid data"}), 400
+
+    # Log the status change
+    log_entry = f"{timestamp} - Device: {device_name}, New Status: {'Active' if new_status else 'Inactive'}, IP: {ip_address}"
+    with open('status_changes.log', 'a') as log_file:
+        log_file.write(log_entry + '\n')
+
+    # Update the device status
+    device_status = get_device_status()
+    device_status[device_name] = new_status
+    close_db(None)
+
+    return jsonify({"message": "Status updated successfully"}), 200
+
 if __name__ == '__main__':
-    init_db()
+    with app.app_context():
+        init_db()
     app.run(debug=True, host='0.0.0.0')

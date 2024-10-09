@@ -9,6 +9,7 @@ This project is a web-based dashboard for monitoring Acronis backup statuses acr
 - Filter devices by tenant
 - Sort devices by various attributes
 - Show detailed status messages on mouseover
+- Store device notes in a JSON file
 
 ## Setup
 
@@ -109,6 +110,10 @@ This project uses environment variables to manage sensitive information and conf
 - `DATACENTER_URL`: The URL of the Acronis datacenter (default: https://us-cloud.acronis.com)
 
 These variables should be set in a `.env` file in the root directory of the project. This file is not committed to version control for security reasons.
+
+## Data Storage
+
+This application uses a JSON file (`device_notes.json`) to store device notes. The file is automatically created when the application starts if it doesn't exist. Make sure the application has write permissions in the directory where it's running.
 
 ## Troubleshooting
 

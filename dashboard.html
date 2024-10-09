@@ -4,46 +4,107 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Acronis Backup Dashboard</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <style>
-        /* ... (previous styles remain unchanged) ... */
-        .status-not-backed-up {
-            color: #8e44ad;
-        }
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0,0,0,0.4);
-        }
-        .modal-content {
-            background-color: #fefefe;
-            margin: 15% auto;
+        body {
+            font-family: 'Roboto', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
             padding: 20px;
-            border: 1px solid #888;
-            width: 80%;
-            max-width: 500px;
+            background-color: #f4f4f4;
         }
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+        }
+        .summary {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+        }
+        .summary-item {
+            text-align: center;
+        }
+        .summary-item h2 {
+            margin: 0;
+            font-size: 2em;
+        }
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .date-picker, .tenant-select {
+            padding: 5px;
+            margin-right: 10px;
+        }
+        .filter-btn {
+            padding: 5px 10px;
+            margin-right: 5px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .filter-btn.active {
+            background-color: #3498db;
+            color: white;
+        }
+        .filter-btn.error {
+            background-color: #e74c3c;
+            color: white;
+        }
+        .filter-btn.warning {
+            background-color: #f39c12;
+            color: white;
+        }
+        .filter-btn.ok {
+            background-color: #2ecc71;
+            color: white;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        th {
+            background-color: #f2f2f2;
             font-weight: bold;
         }
-        .close:hover,
-        .close:focus {
-            color: black;
-            text-decoration: none;
-            cursor: pointer;
+        .status-ok {
+            color: #2ecc71;
+        }
+        .status-warning {
+            color: #f39c12;
+        }
+        .status-error {
+            color: #e74c3c;
+        }
+        .status-not-backed-up {
+            color: #8e44ad;
         }
     </style>
 </head>
@@ -101,20 +162,6 @@
         </table>
     </div>
 
-    <!-- Modal for adding notes -->
-    <div id="noteModal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2>Add Note for Device</h2>
-            <form id="noteForm">
-                <input type="hidden" id="deviceName" name="deviceName">
-                <textarea id="noteText" name="noteText" rows="4" cols="50" required></textarea>
-                <br>
-                <button type="submit">Save Note</button>
-            </form>
-        </div>
-    </div>
-
     <script>
         let allDevices = [];
         let currentFilters = {
@@ -125,9 +172,10 @@
         };
         let currentSort = { column: '', direction: 'asc' };
 
-        // ... (previous JavaScript functions remain unchanged) ...
-
         function updateDashboard() {
+            console.log('Updating dashboard with', allDevices.length, 'devices');
+            console.log('Current filters:', currentFilters);
+
             const tableBody = document.getElementById('deviceTableBody');
             tableBody.innerHTML = '';
             
@@ -142,8 +190,13 @@
                 if (currentFilters.hideNeverBackedUp && device.lastBackup === 'Never') {
                     return false;
                 }
+                if (currentFilters.tenant && device.tenant_name !== currentFilters.tenant) {
+                    return false;
+                }
                 return true;
             });
+
+            console.log('Filtered devices:', devicesToShow.length);
 
             if (currentSort.column) {
                 devicesToShow.sort((a, b) => {
@@ -160,26 +213,33 @@
 
                 const row = tableBody.insertRow();
                 row.insertCell(0).textContent = device.name;
-                row.insertCell(1).textContent = device.type;
+                row.insertCell(1).textContent = device.type.replace('resource.', '');
                 row.insertCell(2).textContent = device.tenant_name;
-                row.insertCell(3).textContent = device.lastBackup;
+                row.insertCell(3).textContent = truncateTime(device.lastBackup);
                 const statusCell = row.insertCell(4);
                 statusCell.innerHTML = getStatusIcon(device.status) + ' ' + device.status;
                 statusCell.className = `status-${device.status.toLowerCase().replace(' ', '-')}`;
                 statusCell.title = device.status_message;
 
                 const actionsCell = row.insertCell(5);
-                if (device.status === 'Not Backed Up') {
-                    actionsCell.innerHTML = `<button onclick="editNote('${device.name}')">Edit Note</button>`;
-                } else {
-                    actionsCell.innerHTML = `<button onclick="addNote('${device.name}')">Add Note</button>`;
-                }
+                const toggleButton = document.createElement('button');
+                toggleButton.textContent = device.isActive ? 'Active' : 'Inactive';
+                toggleButton.onclick = () => toggleDeviceStatus(device.name, !device.isActive);
+                actionsCell.appendChild(toggleButton);
             });
 
-            document.getElementById('totalDevices').textContent = allDevices.length;
+            document.getElementById('totalDevices').textContent = devicesToShow.length;
             document.getElementById('errorCount').textContent = errorCount;
             document.getElementById('warningCount').textContent = warningCount;
             document.getElementById('notBackedUpCount').textContent = notBackedUpCount;
+
+            console.log('Dashboard updated with', devicesToShow.length, 'devices shown');
+        }
+
+        function truncateTime(dateTimeString) {
+            if (dateTimeString === 'Never') return dateTimeString;
+            const date = new Date(dateTimeString);
+            return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
         }
 
         function getStatusIcon(status) {
@@ -197,60 +257,121 @@
             }
         }
 
-        function addNote(deviceName) {
-            document.getElementById('deviceName').value = deviceName;
-            document.getElementById('noteText').value = '';
-            document.getElementById('noteModal').style.display = 'block';
-        }
+        function toggleDeviceStatus(deviceName, newStatus) {
+            const timestamp = new Date().toISOString();
+            const ipAddress = '192.168.1.65'; // This should be dynamically obtained in a real scenario
 
-        function editNote(deviceName) {
-            fetch(`/api/device_note/${deviceName}`)
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('deviceName').value = deviceName;
-                    document.getElementById('noteText').value = data.note;
-                    document.getElementById('noteModal').style.display = 'block';
-                })
-                .catch(error => console.error('Error:', error));
-        }
-
-        document.getElementById('noteForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const deviceName = document.getElementById('deviceName').value;
-            const note = document.getElementById('noteText').value;
-            fetch('/api/device_note', {
+            fetch('/api/toggle_device_status', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ device_name: deviceName, note: note }),
+                body: JSON.stringify({
+                    device_name: deviceName,
+                    new_status: newStatus,
+                    timestamp: timestamp,
+                    ip_address: ipAddress
+                }),
             })
             .then(response => response.json())
             .then(data => {
-                console.log('Success:', data);
-                document.getElementById('noteModal').style.display = 'none';
+                console.log('Status changed:', data);
                 fetchData(); // Refresh the data
             })
-            .catch((error) => {
-                console.error('Error:', error);
-            });
-        });
-
-        // Close the modal when clicking on <span> (x)
-        document.getElementsByClassName('close')[0].onclick = function() {
-            document.getElementById('noteModal').style.display = 'none';
+            .catch(error => console.error('Error:', error));
         }
 
-        // Close the modal when clicking outside of it
-        window.onclick = function(event) {
-            if (event.target == document.getElementById('noteModal')) {
-                document.getElementById('noteModal').style.display = 'none';
+        function setStatusFilter(status) {
+            currentFilters.status = status;
+            updateActiveFilterButton(status);
+            updateDashboard();
+        }
+
+        function updateActiveFilterButton(status) {
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            let buttonId;
+            switch(status.toLowerCase()) {
+                case 'all':
+                    buttonId = 'filterAllBtn';
+                    break;
+                case 'ok':
+                    buttonId = 'filterOkBtn';
+                    break;
+                case 'not backed up':
+                    buttonId = 'filterNotBackedUpBtn';
+                    break;
+                default:
+                    buttonId = `filter${status}Btn`;
+            }
+            const button = document.getElementById(buttonId);
+            if (button) {
+                button.classList.add('active');
+            } else {
+                console.warn(`Button with id ${buttonId} not found`);
             }
         }
 
+        document.getElementById('filterAllBtn').addEventListener('click', () => setStatusFilter('all'));
+        document.getElementById('filterErrorBtn').addEventListener('click', () => setStatusFilter('Error'));
+        document.getElementById('filterWarningBtn').addEventListener('click', () => setStatusFilter('Warning'));
+        document.getElementById('filterOkBtn').addEventListener('click', () => setStatusFilter('OK'));
         document.getElementById('filterNotBackedUpBtn').addEventListener('click', () => setStatusFilter('Not Backed Up'));
 
-        // ... (rest of the JavaScript remains unchanged) ...
+        document.getElementById('filterNeverBackedUp').addEventListener('change', function() {
+            currentFilters.hideNeverBackedUp = this.checked;
+            updateDashboard();
+        });
+
+        document.querySelectorAll('.sort-icon').forEach(th => {
+            th.addEventListener('click', function() {
+                const column = this.dataset.sort;
+                if (currentSort.column === column) {
+                    currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    currentSort.column = column;
+                    currentSort.direction = 'asc';
+                }
+                updateDashboard();
+            });
+        });
+
+        function fetchData() {
+            const date = document.getElementById('datePicker').value;
+            const tenant = document.getElementById('tenantSelect').value;
+            currentFilters.tenant = tenant;
+            console.log('Fetching data for date:', date, 'and tenant:', tenant);
+            fetch(`/api/devices?date=${date}&tenant=${tenant}`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Received', data.length, 'devices from API');
+                    allDevices = data;
+                    updateDashboard();
+                    document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        function fetchTenants() {
+            fetch('/api/tenants')
+                .then(response => response.json())
+                .then(data => {
+                    const select = document.getElementById('tenantSelect');
+                    select.innerHTML = '<option value="">All Tenants</option>';
+                    data.forEach(tenant => {
+                        const option = document.createElement('option');
+                        option.value = tenant;
+                        option.textContent = tenant;
+                        select.appendChild(option);
+                    });
+                    $(select).select2().on('change', function() {
+                        console.log('Tenant changed to:', this.value);
+                        fetchData();
+                    });
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        document.getElementById('datePicker').addEventListener('change', fetchData);
 
         // Set initial date to today
         document.getElementById('datePicker').valueAsDate = new Date();
