@@ -92,6 +92,10 @@ def fetch_resources(access_token):
         try:
             response = requests.get(protection_status_url, headers=headers, params=params)
             response.raise_for_status()
+            app.logger.info(f"Raw response content: {response.text}")
+            if not response.text:
+                app.logger.error("Empty response received from API")
+                break
             data = response.json()
             resources.extend(data.get('items', []))
             if 'next' not in data.get('paging', {}).get('cursors', {}):
@@ -99,6 +103,8 @@ def fetch_resources(access_token):
             params['cursor'] = data['paging']['cursors']['next']
         except requests.RequestException as e:
             app.logger.error(f"Error fetching resources: {str(e)}")
+            app.logger.error(f"Response status code: {response.status_code}")
+            app.logger.error(f"Response headers: {response.headers}")
             raise
         except json.JSONDecodeError as e:
             app.logger.error(f"Error decoding JSON response: {str(e)}")
