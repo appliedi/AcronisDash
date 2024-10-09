@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from flask import Flask, jsonify, request, send_from_directory
 import pytz
 from dotenv import load_dotenv
+import re
 
 # Load environment variables
 load_dotenv()
@@ -46,6 +47,20 @@ def fetch_resources(access_token):
         params['cursor'] = data['paging']['cursors']['next']
     return resources
 
+def parse_date(date_string):
+    # Regular expression to match ISO 8601 format with optional microseconds
+    pattern = r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d+)?([-+]\d{2}:\d{2}|Z)?'
+    match = re.match(pattern, date_string)
+    if match:
+        main_part, microseconds, timezone = match.groups()
+        if timezone == 'Z':
+            timezone = '+00:00'
+        elif timezone is None:
+            timezone = '+00:00'
+        parsed_string = f"{main_part}{timezone}"
+        return datetime.fromisoformat(parsed_string)
+    raise ValueError(f"Invalid date format: {date_string}")
+
 def process_resources(resources, filter_date, filter_tenant):
     processed_resources = []
     filter_date = datetime.fromisoformat(filter_date).replace(tzinfo=pytz.UTC)
@@ -70,14 +85,18 @@ def process_resources(resources, filter_date, filter_tenant):
                 break
 
         if last_success_run:
-            last_backup = datetime.fromisoformat(last_success_run.replace('Z', '+00:00'))
-            if last_backup > filter_date:
-                status = 'OK'
-                status_message = f"Last successful backup: {last_backup.strftime('%Y-%m-%d %H:%M:%S')}"
-            else:
-                status = 'Warning'
-                days_since_backup = (datetime.now(pytz.UTC) - last_backup).days
-                status_message = f"Last backup was {days_since_backup} days ago. Consider running a new backup."
+            try:
+                last_backup = parse_date(last_success_run)
+                if last_backup > filter_date:
+                    status = 'OK'
+                    status_message = f"Last successful backup: {last_backup.strftime('%Y-%m-%d %H:%M:%S')}"
+                else:
+                    status = 'Warning'
+                    days_since_backup = (datetime.now(pytz.UTC) - last_backup).days
+                    status_message = f"Last backup was {days_since_backup} days ago. Consider running a new backup."
+            except ValueError as e:
+                status = 'Error'
+                status_message = f"Error parsing backup date: {str(e)}"
         else:
             status = 'Error'
             status_message = "This device has never been backed up. Immediate action required."
