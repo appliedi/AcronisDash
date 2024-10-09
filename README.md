@@ -24,7 +24,13 @@ This project is a web-based dashboard for monitoring Acronis backup statuses acr
    ```
 
 3. Set up your Acronis API credentials:
-   Edit the `main.py` file and replace the `client_id` and `client_secret` variables with your actual Acronis API credentials.
+   Create a `.env` file in the root directory of the project and add the following content:
+   ```
+   CLIENT_ID=your_client_id_here
+   CLIENT_SECRET=your_client_secret_here
+   DATACENTER_URL=https://us-cloud.acronis.com
+   ```
+   Replace `your_client_id_here` and `your_client_secret_here` with your actual Acronis API credentials.
 
 4. Run the application:
    ```
@@ -37,17 +43,19 @@ This project is a web-based dashboard for monitoring Acronis backup statuses acr
 
 To run this application using Docker:
 
-1. Build the Docker image:
+1. Make sure you have created the `.env` file as described in the Setup section.
+
+2. Build the Docker image:
    ```
    docker build -t acronis-backup-dashboard .
    ```
 
-2. Run the Docker container:
+3. Run the Docker container:
    ```
-   docker run -p 5000:5000 acronis-backup-dashboard
+   docker run --env-file .env -p 5000:5000 acronis-backup-dashboard
    ```
 
-3. Access the dashboard at `http://localhost:5000`
+4. Access the dashboard at `http://localhost:5000`
 
 ## Docker Compose Deployment
 
@@ -55,19 +63,31 @@ To run this application using Docker Compose:
 
 1. Make sure you have Docker Compose installed on your system.
 
-2. From the project root directory, run:
+2. Ensure you have created the `.env` file as described in the Setup section.
+
+3. From the project root directory, run:
    ```
    docker-compose up --build
    ```
 
-3. Access the dashboard at `http://localhost:5000`
+4. Access the dashboard at `http://localhost:5000`
 
-4. To stop the application, use:
+5. To stop the application, use:
    ```
    docker-compose down
    ```
 
 Using Docker Compose simplifies the process of running the application and makes it easier to add additional services in the future if needed.
+
+## Environment Variables
+
+This project uses environment variables to manage sensitive information and configuration. The following variables are required:
+
+- `CLIENT_ID`: Your Acronis API client ID
+- `CLIENT_SECRET`: Your Acronis API client secret
+- `DATACENTER_URL`: The URL of the Acronis datacenter (default: https://us-cloud.acronis.com)
+
+These variables should be set in a `.env` file in the root directory of the project. This file is not committed to version control for security reasons.
 
 ## Contributing
 
