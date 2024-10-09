@@ -89,12 +89,24 @@ def fetch_resources(access_token):
     }
     resources = []
     while True:
-        response = requests.get(protection_status_url, headers=headers, params=params)
-        data = response.json()
-        resources.extend(data.get('items', []))
-        if 'next' not in data.get('paging', {}).get('cursors', {}):
-            break
-        params['cursor'] = data['paging']['cursors']['next']
+        try:
+            response = requests.get(protection_status_url, headers=headers, params=params)
+            response.raise_for_status()
+            data = response.json()
+            resources.extend(data.get('items', []))
+            if 'next' not in data.get('paging', {}).get('cursors', {}):
+                break
+            params['cursor'] = data['paging']['cursors']['next']
+        except requests.RequestException as e:
+            app.logger.error(f"Error fetching resources: {str(e)}")
+            raise
+        except json.JSONDecodeError as e:
+            app.logger.error(f"Error decoding JSON response: {str(e)}")
+            app.logger.error(f"Response content: {response.text}")
+            raise
+        except Exception as e:
+            app.logger.error(f"Unexpected error fetching resources: {str(e)}")
+            raise
     return resources
 
 def parse_date(date_string):
