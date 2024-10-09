@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acronis Backup Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .summary-item {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .summary-item h2 {
+            margin: 0;
+            font-size: 2.5em;
+        }
+        .summary-item p {
+            margin: 5px 0 0;
+            color: #7f8c8d;
+        }
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        .filter-btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .filter-btn:hover, .filter-btn.active {
+            background-color: #2980b9;
+        }
+        .filter-btn.error {
+            background-color: #e74c3c;
+        }
+        .filter-btn.error:hover, .filter-btn.error.active {
+            background-color: #c0392b;
+        }
+        .filter-btn.warning {
+            background-color: #f39c12;
+        }
+        .filter-btn.warning:hover, .filter-btn.warning.active {
+            background-color: #d35400;
+        }
+        .filter-btn.ok {
+            background-color: #2ecc71;
+        }
+        .filter-btn.ok:hover, .filter-btn.ok.active {
+            background-color: #27ae60;
+        }
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            margin-left: 20px;
+        }
+        .checkbox-container input {
+            margin-right: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 10px;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 15px;
+            text-align: left;
+            background-color: #fff;
+        }
+        th {
+            background-color: #34495e;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        th:hover {
+            background-color: #2c3e50;
+        }
+        tr {
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+        tr:hover {
+            transform: translateY(-3px);
+        }
+        .status-ok {
+            color: #2ecc71;
+        }
+        .status-warning {
+            color: #f39c12;
+        }
+        .status-error {
+            color: #e74c3c;
+        }
+        .hidden {
+            display: none;
+        }
+        .sort-icon::after {
+            content: '\f0dc';
+            font-family: 'Font Awesome 5 Free';
+            font-weight: 900;
+            margin-left: 5px;
+            font-size: 0.8em;
+        }
+        .sort-icon.asc::after {
+            content: '\f0de';
+        }
+        .sort-icon.desc::after {
+            content: '\f0dd';
+        }
+        .date-picker, .tenant-select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        .select2-container {
+            min-width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Acronis Backup Dashboard</h1>
+        <div class="summary">
+            <div class="summary-item">
+                <h2 id="totalDevices">0</h2>
+                <p>Total Devices</p>
+            </div>
+            <div class="summary-item">
+                <h2 id="errorCount">0</h2>
+                <p>Errors</p>
+            </div>
+            <div class="summary-item">
+                <h2 id="warningCount">0</h2>
+                <p>Warnings</p>
+            </div>
+        </div>
+        <div class="controls">
+            <input type="date" id="datePicker" class="date-picker">
+            <select id="tenantSelect" class="tenant-select">
+                <option value="">All Tenants</option>
+            </select>
+            <button id="filterAllBtn" class="filter-btn active">All</button>
+            <button id="filterErrorBtn" class="filter-btn error">Errors</button>
+            <button id="filterWarningBtn" class="filter-btn warning">Warnings</button>
+            <button id="filterOkBtn" class="filter-btn ok">OK</button>
+            <div class="checkbox-container">
+                <input type="checkbox" id="filterNeverBackedUp">
+                <label for="filterNeverBackedUp">Hide Never Backed Up</label>
+            </div>
+            <p>Last updated: <span id="lastUpdated"></span></p>
+        </div>
+        <table id="deviceTable">
+            <thead>
+                <tr>
+                    <th class="sort-icon" data-sort="name">Device Name</th>
+                    <th class="sort-icon" data-sort="type">Resource Type</th>
+                    <th class="sort-icon" data-sort="tenant_name">Tenant Name</th>
+                    <th class="sort-icon" data-sort="lastBackup">Last Backup</th>
+                    <th class="sort-icon" data-sort="status">Status</th>
+                </tr>
+            </thead>
+            <tbody id="deviceTableBody">
+                <!-- Data will be inserted here by JavaScript -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        let allDevices = [];
+        let currentFilters = {
+            status: 'all',
+            hideNeverBackedUp: false,
+            date: new Date().toISOString().split('T')[0], // Today's date
+            tenant: ''
+        };
+        let currentSort = { column: '', direction: 'asc' };
+
+        function fetchTenants() {
+            fetch('/api/tenants')
+                .then(response => response.json())
+                .then(tenants => {
+                    const tenantSelect = document.getElementById('tenantSelect');
+                    tenants.sort((a, b) => a.localeCompare(b)); // Sort tenants alphabetically
+                    tenants.forEach(tenant => {
+                        const option = document.createElement('option');
+                        option.value = tenant;
+                        option.textContent = tenant;
+                        tenantSelect.appendChild(option);
+                    });
+                    $(tenantSelect).select2({
+                        placeholder: "Select a tenant",
+                        allowClear: true
+                    });
+                })
+                .catch(error => console.error('Error fetching tenants:', error));
+        }
+
+        function fetchData() {
+            const url = new URL('/api/devices', window.location.origin);
+            url.searchParams.append('date', currentFilters.date);
+            if (currentFilters.tenant) {
+                url.searchParams.append('tenant', currentFilters.tenant);
+            }
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    allDevices = data;
+                    updateDashboard();
+                    document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        function updateDashboard() {
+            const tableBody = document.getElementById('deviceTableBody');
+            tableBody.innerHTML = '';
+            
+            let errorCount = 0;
+            let warningCount = 0;
+
+            let devicesToShow = allDevices.filter(device => {
+                if (currentFilters.status !== 'all' && device.status !== currentFilters.status) {
+                    return false;
+                }
+                if (currentFilters.hideNeverBackedUp && device.lastBackup === 'Never') {
+                    return false;
+                }
+                return true;
+            });
+
+            if (currentSort.column) {
+                devicesToShow.sort((a, b) => {
+                    if (a[currentSort.column] < b[currentSort.column]) return currentSort.direction === 'asc' ? -1 : 1;
+                    if (a[currentSort.column] > b[currentSort.column]) return currentSort.direction === 'asc' ? 1 : -1;
+                    return 0;
+                });
+            }
+
+            devicesToShow.forEach(device => {
+                if (device.status === 'Error') errorCount++;
+                if (device.status === 'Warning') warningCount++;
+
+                const row = tableBody.insertRow();
+                row.insertCell(0).textContent = device.name;
+                row.insertCell(1).textContent = device.type;
+                row.insertCell(2).textContent = device.tenant_name;
+                row.insertCell(3).textContent = device.lastBackup;
+                const statusCell = row.insertCell(4);
+                statusCell.innerHTML = getStatusIcon(device.status) + ' ' + device.status;
+                statusCell.className = `status-${device.status.toLowerCase()}`;
+            });
+
+            document.getElementById('totalDevices').textContent = allDevices.length;
+            document.getElementById('errorCount').textContent = errorCount;
+            document.getElementById('warningCount').textContent = warningCount;
+        }
+
+        function getStatusIcon(status) {
+            switch(status) {
+                case 'OK':
+                    return '<i class="fas fa-check-circle"></i>';
+                case 'Warning':
+                    return '<i class="fas fa-exclamation-triangle"></i>';
+                case 'Error':
+                    return '<i class="fas fa-times-circle"></i>';
+                default:
+                    return '<i class="fas fa-question-circle"></i>';
+            }
+        }
+
+        document.getElementById('filterAllBtn').addEventListener('click', () => setStatusFilter('all'));
+        document.getElementById('filterErrorBtn').addEventListener('click', () => setStatusFilter('Error'));
+        document.getElementById('filterWarningBtn').addEventListener('click', () => setStatusFilter('Warning'));
+        document.getElementById('filterOkBtn').addEventListener('click', () => setStatusFilter('OK'));
+
+        function setStatusFilter(status) {
+            currentFilters.status = status;
+            updateFilterButtons();
+            updateDashboard();
+        }
+
+        function updateFilterButtons() {
+            const buttons = ['filterAllBtn', 'filterErrorBtn', 'filterWarningBtn', 'filterOkBtn'];
+            buttons.forEach(btn => {
+                document.getElementById(btn).classList.remove('active');
+            });
+            document.getElementById(`filter${currentFilters.status.charAt(0).toUpperCase() + currentFilters.status.slice(1)}Btn`).classList.add('active');
+        }
+
+        document.getElementById('filterNeverBackedUp').addEventListener('change', function() {
+            currentFilters.hideNeverBackedUp = this.checked;
+            updateDashboard();
+        });
+
+        document.getElementById('datePicker').addEventListener('change', function() {
+            currentFilters.date = this.value;
+            fetchData();
+        });
+
+        $('#tenantSelect').on('change', function() {
+            currentFilters.tenant = this.value;
+            fetchData();
+        });
+
+        document.querySelectorAll('th').forEach(th => {
+            th.addEventListener('click', () => {
+                const column = th.dataset.sort;
+                if (currentSort.column === column) {
+                    currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    currentSort.column = column;
+                    currentSort.direction = 'asc';
+                }
+                
+                document.querySelectorAll('th').forEach(header => {
+                    header.classList.remove('asc', 'desc');
+                });
+                th.classList.add(currentSort.direction);
+                
+                updateDashboard();
+            });
+        });
+
+        // Set initial date to today
+        document.getElementById('datePicker').valueAsDate = new Date();
+
+        // Fetch tenants and initial data
+        fetchTenants();
+        fetchData();
+
+        // Refresh data every 5 minutes
+        setInterval(fetchData, 300000);
+    </script>
+</body>
+</html>
