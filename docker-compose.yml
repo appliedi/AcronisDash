@@ -6,23 +6,6 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - .:/app
-      - ./data:/app/data
-    env_file:
-      - .env
-    command: >
-      sh -c "
-        mkdir -p /app/data &&
-        touch /app/data/device_notes.json /app/data/device_status.json /app/data/status_changes.log /app/data/app.log /app/data/resources_cache.json &&
-        chown -R nobody:nogroup /app/data &&
-        python main.py
-      "
-
-  web-prod:
-    build: .
-    ports:
-      - "5001:5000"
-    volumes:
       - ./data:/app/data
     environment:
       - FLASK_ENV=production

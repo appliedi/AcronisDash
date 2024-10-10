@@ -1,89 +1,114 @@
+from flask import jsonify, request
+from app import app
+import requests
 import os
-from flask import Blueprint, jsonify, request, send_from_directory
-from datetime import datetime
-import pytz
-from models import get_device_status, get_device_note, add_device_note, update_device_status
-from utils import get_access_token, fetch_resources, process_resources
-from cache import get_cached_resources, cache_resources, invalidate_cache
-from config import STATUS_CHANGES_LOG
+from datetime import datetime, timedelta
 
-bp = Blueprint('routes', __name__)
+# Acronis API configuration
+ACRONIS_BASE_URL = os.getenv("DATACENTER_URL")
+CLIENT_ID = os.getenv("ACRONIS_CLIENT_ID")
+CLIENT_SECRET = os.getenv("ACRONIS_CLIENT_SECRET")
 
-@bp.route('/')
-def serve_dashboard():
-    return send_from_directory('.', 'dashboard.html')
+def get_access_token():
+    token_url = f"{ACRONIS_BASE_URL}/api/2/idp/token"
+    data = {
+        "grant_type": "client_credentials",
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET
+    }
+    response = requests.post(token_url, data=data)
+    if response.status_code == 200:
+        return response.json()["access_token"]
+    else:
+        app.logger.error(f"Failed to obtain access token. Status code: {response.status_code}, Response: {response.text}")
+        raise Exception("Failed to obtain access token")
 
-@bp.route('/api/devices')
-def get_devices():
-    filter_date = request.args.get('date', datetime.now(pytz.UTC).strftime('%Y-%m-%d'))
-    filter_tenant = request.args.get('tenant', '')
-    try:
-        cached_resources = get_cached_resources()
-        if cached_resources is None:
-            access_token = get_access_token()
-            resources = fetch_resources(access_token)
-            cache_resources(resources)
-        else:
-            resources = cached_resources
-        
-        device_status = get_device_status()
-        processed_resources = process_resources(resources, filter_date, filter_tenant, device_status)
-        return jsonify(processed_resources)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@bp.route('/api/tenants')
+@app.route('/api/tenants', methods=['GET'])
 def get_tenants():
     try:
-        cached_resources = get_cached_resources()
-        if cached_resources is None:
-            access_token = get_access_token()
-            resources = fetch_resources(access_token)
-            cache_resources(resources)
+        access_token = get_access_token()
+        headers = {"Authorization": f"Bearer {access_token}"}
+        response = requests.get(f"{ACRONIS_BASE_URL}/api/2/clients", headers=headers)
+        app.logger.info(f"Full response from /api/2/clients: {response.text}")
+        if response.status_code == 200:
+            tenants = response.json().get("items", [])
+            return jsonify([{"id": tenant.get("id"), "name": tenant.get("name")} for tenant in tenants])
         else:
-            resources = cached_resources
-        
-        tenants = list(set(resource.get('context', {}).get('tenant_name', 'N/A') for resource in resources))
-        tenants.sort()  # Sort the list of tenants alphabetically
-        return jsonify(tenants)
+            app.logger.error(f"Failed to fetch tenants. Status code: {response.status_code}, Response: {response.text}")
+            return jsonify({"error": "Failed to fetch tenants"}), 500
     except Exception as e:
+        app.logger.error(f"Error in get_tenants: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-@bp.route('/api/device_note', methods=['POST'])
-def add_device_note_route():
-    data = request.json
-    device_name = data.get('device_name')
-    note = data.get('note')
-    if device_name and note:
-        add_device_note(device_name, note)
-        return jsonify({"message": "Note added successfully"}), 200
-    return jsonify({"error": "Invalid data"}), 400
+@app.route('/api/devices', methods=['GET'])
+def get_devices():
+    try:
+        access_token = get_access_token()
+        headers = {"Authorization": f"Bearer {access_token}"}
+        tenant = request.args.get('tenant')
+        date = request.args.get('date')
+        status = request.args.get('status')
+        
+        # Fetch all devices
+        response = requests.get(f"{ACRONIS_BASE_URL}/api/2/resources?type=resource_machine", headers=headers)
+        app.logger.info(f"Full response from /api/2/resources: {response.text}")
+        if response.status_code != 200:
+            app.logger.error(f"Failed to fetch devices. Status code: {response.status_code}, Response: {response.text}")
+            return jsonify({"error": "Failed to fetch devices"}), 500
+        
+        devices = response.json().get("items", [])
+        
+        # Filter devices based on parameters
+        filtered_devices = []
+        for device in devices:
+            if tenant and device.get("tenant_id") != tenant:
+                continue
+            if status and status != 'all' and device.get("status") != status:
+                continue
+            # Note: Date filtering would require additional API calls to get backup information
+            
+            filtered_devices.append({
+                "name": device.get("name", "Unknown"),
+                "status": device.get("status", "Unknown"),
+                "lastBackup": "2024-10-10T00:00:00Z",  # This would need to be fetched from another API endpoint
+                "active": device.get("state", "inactive") == "active"
+            })
+        
+        return jsonify(filtered_devices)
+    except Exception as e:
+        app.logger.error(f"Error in get_devices: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
-@bp.route('/api/device_note/<device_name>', methods=['GET'])
-def get_device_note_route(device_name):
-    note = get_device_note(device_name)
-    return jsonify({"note": note if note else ''})
-
-@bp.route('/api/toggle_device_status', methods=['POST'])
-def toggle_device_status():
-    data = request.json
-    device_name = data.get('device_name')
-    new_status = data.get('new_status')
-    timestamp = data.get('timestamp')
-    ip_address = data.get('ip_address')
-
-    if device_name is None or new_status is None:
-        return jsonify({"error": "Invalid data"}), 400
-
-    # Log the status change
-    log_entry = f"{timestamp} - Device: {device_name}, New Status: {'Active' if new_status else 'Inactive'}, IP: {ip_address}"
-    with open(STATUS_CHANGES_LOG, 'a') as log_file:
-        log_file.write(log_entry + '\n')
-
-    # Update the device status locally
-    update_device_status(device_name, new_status)
-
-    # Invalidate the cache to ensure fresh data on next fetch
-    invalidate_cache()
-
-    return jsonify({"message": "Status updated successfully"}), 200
+@app.route('/api/devices/update_status', methods=['POST'])
+def update_device_status():
+    try:
+        access_token = get_access_token()
+        headers = {"Authorization": f"Bearer {access_token}"}
+        data = request.json
+        device_name = data.get('name')
+        new_active_state = data.get('active')
+        
+        # Find the device
+        response = requests.get(f"{ACRONIS_BASE_URL}/api/2/resources?type=resource_machine&name={device_name}", headers=headers)
+        if response.status_code != 200 or not response.json().get("items"):
+            app.logger.error(f"Device not found. Status code: {response.status_code}, Response: {response.text}")
+            return jsonify({"error": "Device not found"}), 404
+        
+        device = response.json()["items"][0]
+        
+        # Update device status
+        new_state = "active" if new_active_state else "inactive"
+        update_response = requests.patch(
+            f"{ACRONIS_BASE_URL}/api/2/resources/{device['id']}",
+            headers=headers,
+            json={"state": new_state}
+        )
+        
+        if update_response.status_code == 200:
+            return jsonify({"message": "Device status updated successfully", "device": update_response.json()})
+        else:
+            app.logger.error(f"Failed to update device status. Status code: {update_response.status_code}, Response: {update_response.text}")
+            return jsonify({"error": "Failed to update device status"}), 500
+    except Exception as e:
+        app.logger.error(f"Error in update_device_status: {str(e)}")
+        return jsonify({"error": str(e)}), 500
