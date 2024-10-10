@@ -49,6 +49,7 @@ device_states.json
 device_notes.json
 device_status.json
 status_changes.log
+resources_cache.json
 
 # Temporary files
 cline_task_oct-9-2024_10-47-49-am.md
