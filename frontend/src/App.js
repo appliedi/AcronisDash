@@ -44,7 +44,7 @@ function App() {
       setError(null);
       const response = await axios.get('/api/devices', {
         params: {
-          tenant: selectedTenant,
+          tenant: selectedTenant === 'all' ? '' : selectedTenant,
           date: format(selectedDate, 'yyyy-MM-dd'),
         }
       });
@@ -74,11 +74,20 @@ function App() {
 
     if (sortConfig.key !== null) {
       result.sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) {
-          return sortConfig.direction === 'ascending' ? -1 : 1;
-        }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
-          return sortConfig.direction === 'ascending' ? 1 : -1;
+        if (sortConfig.key === 'active') {
+          if (a.active === b.active) return 0;
+          if (sortConfig.direction === 'ascending') {
+            return a.active ? -1 : 1;
+          } else {
+            return a.active ? 1 : -1;
+          }
+        } else {
+          if (a[sortConfig.key] < b[sortConfig.key]) {
+            return sortConfig.direction === 'ascending' ? -1 : 1;
+          }
+          if (a[sortConfig.key] > b[sortConfig.key]) {
+            return sortConfig.direction === 'ascending' ? 1 : -1;
+          }
         }
         return 0;
       });
@@ -162,6 +171,12 @@ function App() {
     setSortConfig({ key, direction });
   };
 
+  const handleTenantChange = (value) => {
+    setSelectedTenant(value);
+    // Trigger a new fetch when the tenant changes
+    fetchDevices();
+  };
+
   if (loading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
   if (error) return <div className="flex items-center justify-center h-screen text-red-500">{error}</div>;
 
@@ -170,7 +185,7 @@ function App() {
       <h1 className="text-4xl font-bold mb-8 text-center text-gray-800">Acronis Backup Dashboard</h1>
       
       <div className="flex justify-between items-center mb-6">
-        <Select onValueChange={setSelectedTenant} value={selectedTenant}>
+        <Select onValueChange={handleTenantChange} value={selectedTenant}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Select tenant" />
           </SelectTrigger>
@@ -279,7 +294,9 @@ function App() {
                 <TableHead onClick={() => requestSort('type')} className="cursor-pointer">
                   Type <ArrowUpDown className="inline-block ml-2" />
                 </TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead onClick={() => requestSort('active')} className="cursor-pointer">
+                  Actions <ArrowUpDown className="inline-block ml-2" />
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
