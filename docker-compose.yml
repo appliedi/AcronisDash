@@ -8,15 +8,30 @@ services:
     volumes:
       - .:/app
       - ./data:/app/data
-    environment:
-      - FLASK_ENV=development
-      - FLASK_APP=main.py
     env_file:
       - .env
     command: >
       sh -c "
         mkdir -p /app/data &&
-        touch /app/data/device_notes.json /app/data/device_status.json /app/data/status_changes.log /app/data/app.log &&
+        touch /app/data/device_notes.json /app/data/device_status.json /app/data/status_changes.log /app/data/app.log /app/data/resources_cache.json &&
         chown -R nobody:nogroup /app/data &&
-        flask run --host=0.0.0.0
+        python main.py
+      "
+
+  web-prod:
+    build: .
+    ports:
+      - "5001:5000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - FLASK_ENV=production
+    env_file:
+      - .env
+    command: >
+      sh -c "
+        mkdir -p /app/data &&
+        touch /app/data/device_notes.json /app/data/device_status.json /app/data/status_changes.log /app/data/app.log /app/data/resources_cache.json &&
+        chown -R nobody:nogroup /app/data &&
+        python main.py
       "
