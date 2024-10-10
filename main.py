@@ -18,7 +18,7 @@ client_secret = os.getenv('ACRONIS_CLIENT_SECRET')
 datacenter_url = os.getenv('DATACENTER_URL')
 
 app = Flask(__name__)
-CORS(app)  # This enables CORS for all routes
+CORS(app, resources={r"/*": {"origins": "*"}})  # Allow all origins for now
 logging.basicConfig(level=logging.DEBUG)
 
 # File to store device active states

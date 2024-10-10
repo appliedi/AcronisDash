@@ -2,6 +2,7 @@ version: '3.8'
 services:
   backend:
     build: .
+    container_name: acronis-backend
     ports:
       - "5001:5001"
     environment:
@@ -10,18 +11,23 @@ services:
       - DATACENTER_URL=${DATACENTER_URL}
     volumes:
       - .:/app
+    networks:
+      - acronis-network
 
   frontend:
     build: 
       context: ./frontend
       dockerfile: Dockerfile
+    container_name: acronis-frontend
     ports:
       - "3001:3001"
     environment:
-      - REACT_APP_BACKEND_URL=http://backend:5001
+      - REACT_APP_BACKEND_URL=http://acronis-backend:5001
     depends_on:
       - backend
+    networks:
+      - acronis-network
 
 networks:
-  default:
-    name: acronis-dashboard-network
+  acronis-network:
+    driver: bridge

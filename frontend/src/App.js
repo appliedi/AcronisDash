@@ -12,9 +12,11 @@ import { Input } from "./components/ui/input"
 import { format } from "date-fns"
 import { CheckCircle, XCircle, AlertTriangle, AlertCircle, Loader2, ArrowUpDown } from 'lucide-react';
 
-// Use an environment variable to determine the backend URL
+// Use the environment variable for the backend URL
 const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5001';
 axios.defaults.baseURL = backendUrl;
+
+console.log('Backend URL:', backendUrl); // Add this line for debugging
 
 function App() {
   const [devices, setDevices] = useState([]);
@@ -31,6 +33,7 @@ function App() {
 
   const fetchTenants = useCallback(async () => {
     try {
+      console.log('Fetching tenants from:', `${backendUrl}/api/tenants`); // Add this line for debugging
       const response = await axios.get('/api/tenants');
       const filteredTenants = [...new Set(response.data.filter(tenant => tenant && tenant.trim() !== ''))];
       setTenants(filteredTenants);
@@ -44,6 +47,7 @@ function App() {
     try {
       setLoading(true);
       setError(null);
+      console.log('Fetching devices from:', `${backendUrl}/api/devices`); // Add this line for debugging
       const response = await axios.get('/api/devices', {
         params: {
           tenant: selectedTenant === 'all' ? '' : selectedTenant,
