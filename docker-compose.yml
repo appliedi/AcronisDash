@@ -3,7 +3,7 @@ services:
   backend:
     build: .
     ports:
-      - "5000:5000"
+      - "5001:5001"
     environment:
       - ACRONIS_CLIENT_ID=${ACRONIS_CLIENT_ID}
       - ACRONIS_CLIENT_SECRET=${ACRONIS_CLIENT_SECRET}

@@ -12,7 +12,7 @@ import { Input } from "./components/ui/input"
 import { format } from "date-fns"
 import { CheckCircle, XCircle, AlertTriangle, AlertCircle, Loader2, ArrowUpDown } from 'lucide-react';
 
-axios.defaults.baseURL = 'http://localhost:5000';
+axios.defaults.baseURL = 'http://localhost:5001';
 
 function App() {
   const [devices, setDevices] = useState([]);

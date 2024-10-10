@@ -7,6 +7,7 @@ import pytz
 from dotenv import load_dotenv
 import os
 import logging
+from dateutil import parser
 
 # Load environment variables
 load_dotenv()
@@ -69,7 +70,7 @@ def fetch_resources(access_token):
 
 def process_resources(resources, filter_date, filter_tenant):
     processed_resources = []
-    filter_date = datetime.fromisoformat(filter_date).replace(tzinfo=pytz.UTC)
+    filter_date = parser.parse(filter_date).replace(tzinfo=pytz.UTC)
     
     for resource in resources:
         context = resource.get('context', {})
@@ -91,11 +92,16 @@ def process_resources(resources, filter_date, filter_tenant):
                 break
 
         if last_success_run:
-            last_backup = datetime.fromisoformat(last_success_run.replace('Z', '+00:00'))
-            if last_backup > filter_date:
-                status = 'OK'
-            else:
-                status = 'Warning'
+            try:
+                last_backup = parser.parse(last_success_run)
+                if last_backup > filter_date:
+                    status = 'OK'
+                else:
+                    status = 'Warning'
+            except ValueError:
+                app.logger.error(f"Invalid date format: {last_success_run}")
+                status = 'Error'
+                last_backup = 'Never'
         else:
             status = 'Error'
             last_backup = 'Never'
@@ -157,4 +163,4 @@ def serve_dashboard():
     return send_from_directory('.', 'dashboard.html')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5001)
