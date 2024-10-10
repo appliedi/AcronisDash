@@ -13,6 +13,9 @@ RUN npm install
 # Copy the current directory contents into the container at /app
 COPY . .
 
+# Set the backend URL environment variable
+ENV REACT_APP_BACKEND_URL=http://backend:5001
+
 # Build the app
 RUN npm run build
 

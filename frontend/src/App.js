@@ -12,7 +12,9 @@ import { Input } from "./components/ui/input"
 import { format } from "date-fns"
 import { CheckCircle, XCircle, AlertTriangle, AlertCircle, Loader2, ArrowUpDown } from 'lucide-react';
 
-axios.defaults.baseURL = 'http://localhost:5001';
+// Use an environment variable to determine the backend URL
+const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5001';
+axios.defaults.baseURL = backendUrl;
 
 function App() {
   const [devices, setDevices] = useState([]);
