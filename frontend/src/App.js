@@ -9,7 +9,7 @@ import { Calendar } from "./components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "./components/ui/popover"
 import { Switch } from "./components/ui/switch"
 import { format } from "date-fns"
-import { CheckCircle, XCircle, AlertTriangle, AlertCircle } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, AlertCircle, Loader2 } from 'lucide-react';
 
 axios.defaults.baseURL = 'http://localhost:5000';
 
@@ -22,6 +22,7 @@ function App() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [statusFilter, setStatusFilter] = useState('all');
   const [showActiveOnly, setShowActiveOnly] = useState(false);
+  const [updatingDevices, setUpdatingDevices] = useState(new Set());
 
   const fetchTenants = useCallback(async () => {
     try {
@@ -64,7 +65,7 @@ function App() {
 
   const filteredDevices = devices.filter(device => 
     (statusFilter === 'all' || device.status === statusFilter) &&
-    (!showActiveOnly || device.status !== 'Error')
+    (!showActiveOnly || device.active)
   );
 
   const getChartData = () => {
@@ -103,6 +104,38 @@ function App() {
     const date = new Date(dateString);
     return isNaN(date.getTime()) ? 'Invalid Date' : format(date, 'yyyy-MM-dd HH:mm');
   };
+
+  const toggleDeviceActive = useCallback(async (deviceName) => {
+    setUpdatingDevices(prev => new Set(prev).add(deviceName));
+    try {
+      const device = devices.find(d => d.name === deviceName);
+      const newActiveState = !device.active;
+      
+      // Make API call to update device status
+      await axios.post('/api/devices/update_status', { 
+        name: deviceName, 
+        active: newActiveState 
+      });
+
+      // Update local state
+      setDevices(prevDevices => 
+        prevDevices.map(d => 
+          d.name === deviceName 
+            ? { ...d, active: newActiveState } 
+            : d
+        )
+      );
+    } catch (err) {
+      console.error('Error updating device status:', err);
+      setError('Error updating device status. Please try again later.');
+    } finally {
+      setUpdatingDevices(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(deviceName);
+        return newSet;
+      });
+    }
+  }, [devices]);
 
   if (loading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
   if (error) return <div className="flex items-center justify-center h-screen text-red-500">{error}</div>;
@@ -207,6 +240,7 @@ function App() {
                 <TableHead>Status</TableHead>
                 <TableHead>Last Backup</TableHead>
                 <TableHead>Type</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -221,6 +255,19 @@ function App() {
                   </TableCell>
                   <TableCell>{formatDate(device.lastBackup)}</TableCell>
                   <TableCell>{device.type}</TableCell>
+                  <TableCell>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => toggleDeviceActive(device.name)}
+                      disabled={updatingDevices.has(device.name)}
+                    >
+                      {updatingDevices.has(device.name) ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : null}
+                      {device.active ? 'Active' : 'Inactive'}
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

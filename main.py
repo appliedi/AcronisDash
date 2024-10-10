@@ -17,8 +17,23 @@ client_secret = os.getenv('ACRONIS_CLIENT_SECRET')
 datacenter_url = os.getenv('DATACENTER_URL')
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+CORS(app)  # This enables CORS for all routes
 logging.basicConfig(level=logging.DEBUG)
+
+# File to store device active states
+DEVICE_STATES_FILE = 'device_states.json'
+
+def load_device_states():
+    if os.path.exists(DEVICE_STATES_FILE):
+        with open(DEVICE_STATES_FILE, 'r') as f:
+            return json.load(f)
+    return {}
+
+def save_device_states(states):
+    with open(DEVICE_STATES_FILE, 'w') as f:
+        json.dump(states, f)
+
+device_states = load_device_states()
 
 def get_access_token():
     auth_url = f'{datacenter_url}/api/2/idp/token'
@@ -85,12 +100,14 @@ def process_resources(resources, filter_date, filter_tenant):
             status = 'Error'
             last_backup = 'Never'
 
+        device_name = context.get('name', 'N/A')
         processed_resources.append({
-            'name': context.get('name', 'N/A'),
+            'name': device_name,
             'type': resource_type,
             'tenant_name': tenant_name,
             'lastBackup': last_success_run if last_success_run else 'Never',
-            'status': status
+            'status': status,
+            'active': device_states.get(device_name, True)  # Default to True if not found
         })
 
     return processed_resources
@@ -116,6 +133,24 @@ def get_tenants():
     resources = fetch_resources(access_token)
     tenants = set(resource.get('context', {}).get('tenant_name', 'N/A') for resource in resources)
     return jsonify(list(tenants))
+
+@app.route('/api/devices/update_status', methods=['POST'])
+def update_device_status():
+    try:
+        data = request.json
+        device_name = data.get('name')
+        new_active_state = data.get('active')
+        
+        if device_name is None or new_active_state is None:
+            return jsonify({"error": "Missing device name or active state"}), 400
+
+        device_states[device_name] = new_active_state
+        save_device_states(device_states)
+        
+        return jsonify({"message": "Device status updated successfully", "device": {"name": device_name, "active": new_active_state}})
+    except Exception as e:
+        app.logger.error(f"Error in update_device_status: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/')
 def serve_dashboard():
