@@ -1,0 +1,20 @@
+version: '3.8'
+services:
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - REACT_APP_BACKEND_URL=${REACT_APP_BACKEND_URL:-http://acronis-backend:5001}
+    container_name: acronis-frontend
+    ports:
+      - "3001:3001"
+    environment:
+      - REACT_APP_BACKEND_URL=${REACT_APP_BACKEND_URL:-http://acronis-backend:5001}
+    networks:
+      - acronis-network
+
+networks:
+  acronis-network:
+    name: acronis-dashboard-network
+    external: true

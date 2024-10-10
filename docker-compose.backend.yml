@@ -1,0 +1,20 @@
+version: '3.8'
+services:
+  backend:
+    build: .
+    container_name: acronis-backend
+    ports:
+      - "5001:5001"
+    environment:
+      - ACRONIS_CLIENT_ID=${ACRONIS_CLIENT_ID}
+      - ACRONIS_CLIENT_SECRET=${ACRONIS_CLIENT_SECRET}
+      - DATACENTER_URL=${DATACENTER_URL}
+    volumes:
+      - .:/app
+    networks:
+      - acronis-network
+
+networks:
+  acronis-network:
+    name: acronis-dashboard-network
+    external: true
