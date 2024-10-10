@@ -1,29 +1,55 @@
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
-
-# Virtual Environment
-venv/
+*.pyo
+*.pyd
+.Python
 env/
-ENV/
+venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
 
-# IDEs and Editors
-.vscode/
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# IDEs
 .idea/
+.vscode/
 *.swp
 *.swo
+*.swn
+*.bak
 
-# OS generated files
+# OS generated
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
 # Application specific
-*.log
-*.sqlite
-*.json
-
-# Credentials (for security, never commit these)
-*.pem
-*.key
 .env
+device_states.json
+device_notes.json
+device_status.json
+status_changes.log
+
+# Temporary files
+cline_task_oct-9-2024_10-47-49-am.md
+cline_task_oct-9-2024_11-10-58-am.md

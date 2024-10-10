@@ -1,20 +1,20 @@
-version: '3.8'
-
+version: '3'
 services:
-  web:
+  backend:
     build: .
     ports:
       - "5000:5000"
-    volumes:
-      - ./data:/app/data
     environment:
-      - FLASK_ENV=production
-    env_file:
-      - .env
-    command: >
-      sh -c "
-        mkdir -p /app/data &&
-        touch /app/data/device_notes.json /app/data/device_status.json /app/data/status_changes.log /app/data/app.log /app/data/resources_cache.json &&
-        chown -R nobody:nogroup /app/data &&
-        python main.py
-      "
+      - ACRONIS_CLIENT_ID=${ACRONIS_CLIENT_ID}
+      - ACRONIS_CLIENT_SECRET=${ACRONIS_CLIENT_SECRET}
+      - DATACENTER_URL=${DATACENTER_URL}
+    volumes:
+      - .:/app
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+    depends_on:
+      - backend
