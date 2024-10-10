@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card"
@@ -8,8 +8,9 @@ import { Button } from "./components/ui/button"
 import { Calendar } from "./components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "./components/ui/popover"
 import { Switch } from "./components/ui/switch"
+import { Input } from "./components/ui/input"
 import { format } from "date-fns"
-import { CheckCircle, XCircle, AlertTriangle, AlertCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, AlertTriangle, AlertCircle, Loader2, ArrowUpDown } from 'lucide-react';
 
 axios.defaults.baseURL = 'http://localhost:5000';
 
@@ -23,11 +24,12 @@ function App() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [showActiveOnly, setShowActiveOnly] = useState(false);
   const [updatingDevices, setUpdatingDevices] = useState(new Set());
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'ascending' });
 
   const fetchTenants = useCallback(async () => {
     try {
       const response = await axios.get('/api/tenants');
-      // Filter out any empty tenant names and ensure unique values
       const filteredTenants = [...new Set(response.data.filter(tenant => tenant && tenant.trim() !== ''))];
       setTenants(filteredTenants);
     } catch (err) {
@@ -63,13 +65,30 @@ function App() {
     fetchDevices();
   }, [fetchDevices]);
 
-  const filteredDevices = devices.filter(device => 
-    (statusFilter === 'all' || device.status === statusFilter) &&
-    (!showActiveOnly || device.active)
-  );
+  const filteredAndSortedDevices = useMemo(() => {
+    let result = devices.filter(device => 
+      (statusFilter === 'all' || device.status === statusFilter) &&
+      (!showActiveOnly || device.active) &&
+      device.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    if (sortConfig.key !== null) {
+      result.sort((a, b) => {
+        if (a[sortConfig.key] < b[sortConfig.key]) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (a[sortConfig.key] > b[sortConfig.key]) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    return result;
+  }, [devices, statusFilter, showActiveOnly, searchTerm, sortConfig]);
 
   const getChartData = () => {
-    const statusCounts = filteredDevices.reduce((acc, device) => {
+    const statusCounts = filteredAndSortedDevices.reduce((acc, device) => {
       acc[device.status] = (acc[device.status] || 0) + 1;
       return acc;
     }, {});
@@ -80,8 +99,8 @@ function App() {
     }));
   };
 
-  const getTotalDevices = () => filteredDevices.length;
-  const getDevicesByStatus = (status) => filteredDevices.filter(device => device.status === status).length;
+  const getTotalDevices = () => filteredAndSortedDevices.length;
+  const getDevicesByStatus = (status) => filteredAndSortedDevices.filter(device => device.status === status).length;
 
   const statusFilters = [
     { key: 'all', label: 'All' },
@@ -111,13 +130,11 @@ function App() {
       const device = devices.find(d => d.name === deviceName);
       const newActiveState = !device.active;
       
-      // Make API call to update device status
       await axios.post('/api/devices/update_status', { 
         name: deviceName, 
         active: newActiveState 
       });
 
-      // Update local state
       setDevices(prevDevices => 
         prevDevices.map(d => 
           d.name === deviceName 
@@ -136,6 +153,14 @@ function App() {
       });
     }
   }, [devices]);
+
+  const requestSort = (key) => {
+    let direction = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
 
   if (loading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
   if (error) return <div className="flex items-center justify-center h-screen text-red-500">{error}</div>;
@@ -233,18 +258,32 @@ function App() {
           <CardTitle>Device List</CardTitle>
         </CardHeader>
         <CardContent>
+          <Input
+            placeholder="Search devices..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="mb-4"
+          />
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Device Name</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Last Backup</TableHead>
-                <TableHead>Type</TableHead>
+                <TableHead onClick={() => requestSort('name')} className="cursor-pointer">
+                  Device Name <ArrowUpDown className="inline-block ml-2" />
+                </TableHead>
+                <TableHead onClick={() => requestSort('status')} className="cursor-pointer">
+                  Status <ArrowUpDown className="inline-block ml-2" />
+                </TableHead>
+                <TableHead onClick={() => requestSort('lastBackup')} className="cursor-pointer">
+                  Last Backup <ArrowUpDown className="inline-block ml-2" />
+                </TableHead>
+                <TableHead onClick={() => requestSort('type')} className="cursor-pointer">
+                  Type <ArrowUpDown className="inline-block ml-2" />
+                </TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredDevices.map((device) => (
+              {filteredAndSortedDevices.map((device) => (
                 <TableRow key={device.name}>
                   <TableCell>{device.name}</TableCell>
                   <TableCell>
